@@ -1,0 +1,9 @@
+{
+  "name": "Display Color Correction",
+  "description": "Applies per-channel brightness and saturation correction to the display via GLSL shader. Useful for reducing oversaturation on OLED panels (e.g. ASUS Zenbook).",
+  "uuid": "display-color-correct@antoniopicone.it",
+  "shell-version": ["48", "49", "50"],
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.display-color-correct",
+  "url": "https://github.com/antoniopicone/display-color-correct"
+}

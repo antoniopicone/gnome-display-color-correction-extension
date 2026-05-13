@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.display-color-correct"
+          path="/org/gnome/shell/extensions/display-color-correct/">
+    <key name="red-factor" type="d">
+      <default>1.0</default>
+      <summary>Red channel brightness factor</summary>
+    </key>
+    <key name="green-factor" type="d">
+      <default>1.0</default>
+      <summary>Green channel brightness factor</summary>
+    </key>
+    <key name="blue-factor" type="d">
+      <default>1.0</default>
+      <summary>Blue channel brightness factor</summary>
+    </key>
+    <key name="red-saturation" type="d">
+      <default>0.73</default>
+      <summary>Red channel saturation factor</summary>
+    </key>
+    <key name="green-saturation" type="d">
+      <default>0.90</default>
+      <summary>Green channel saturation factor</summary>
+    </key>
+    <key name="blue-saturation" type="d">
+      <default>0.93</default>
+      <summary>Blue channel saturation factor</summary>
+    </key>
+  </schema>
+</schemalist>
