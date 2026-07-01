@@ -213,15 +213,7 @@ export default class DisplayColorCorrection extends Extension {
     }
 
     _factorsForConnector(connector) {
-        const overrides = this._loadOverrides();
-        const o = overrides[connector];
-        if (o) {
-            return [
-                o.r    ?? 1.0, o.g    ?? 1.0, o.b    ?? 1.0,
-                o.rSat ?? 1.0, o.gSat ?? 1.0, o.bSat ?? 1.0,
-            ];
-        }
-        return [
+        const defaults = [
             this._settings.get_double('red-factor'),
             this._settings.get_double('green-factor'),
             this._settings.get_double('blue-factor'),
@@ -229,12 +221,26 @@ export default class DisplayColorCorrection extends Extension {
             this._settings.get_double('green-saturation'),
             this._settings.get_double('blue-saturation'),
         ];
+
+        if (!this._settings.get_boolean('per-monitor-enabled'))
+            return defaults;
+
+        const o = this._loadOverrides()[connector];
+        if (!o)
+            return defaults;
+
+        return [
+            o.r    ?? 1.0, o.g    ?? 1.0, o.b    ?? 1.0,
+            o.rSat ?? 1.0, o.gSat ?? 1.0, o.bSat ?? 1.0,
+        ];
     }
 
     _applyAllSettings() {
         const overrides = this._loadOverrides();
+        const perMonitorEnabled = this._settings.get_boolean('per-monitor-enabled');
         console.log(
-            `[DisplayColorCorrection] overrides keys: ${Object.keys(overrides).join(', ') || '(none)'}`
+            `[DisplayColorCorrection] per-monitor-enabled=${perMonitorEnabled} ` +
+            `overrides keys: ${Object.keys(overrides).join(', ') || '(none)'}`
         );
 
         const monitors = Main.layoutManager.monitors;
@@ -255,7 +261,7 @@ export default class DisplayColorCorrection extends Extension {
         for (let i = 0; i < count; i++) {
             const monitor = monitors[i];
             const connector = this._connectorForMonitor(monitor);
-            const hasOverride = !!overrides[connector];
+            const hasOverride = perMonitorEnabled && !!overrides[connector];
             const [mr, mg, mb, mrSat, mgSat, mbSat] = this._factorsForConnector(connector);
 
             console.log(

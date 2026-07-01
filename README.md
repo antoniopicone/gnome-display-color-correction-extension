@@ -23,11 +23,13 @@ All values are stored in GSettings under `org.gnome.shell.extensions.display-col
 | `red-factor` | `1.0` | 0.1 – 1.0 | Red channel brightness |
 | `green-factor` | `1.0` | 0.1 – 1.0 | Green channel brightness |
 | `blue-factor` | `1.0` | 0.1 – 1.0 | Blue channel brightness |
-| `red-saturation` | `0.73` | 0.0 – 2.0 | Red channel saturation |
-| `green-saturation` | `0.90` | 0.0 – 2.0 | Green channel saturation |
-| `blue-saturation` | `0.93` | 0.0 – 2.0 | Blue channel saturation |
+| `red-saturation` | `1.0` | 0.0 – 2.0 | Red channel saturation |
+| `green-saturation` | `1.0` | 0.0 – 2.0 | Green channel saturation |
+| `blue-saturation` | `1.0` | 0.0 – 2.0 | Blue channel saturation |
+| `monitor-overrides` | `{}` | — | JSON map of per-monitor overrides, keyed by connector name |
+| `per-monitor-enabled` | `false` | — | Whether per-monitor overrides take effect |
 
-The defaults (`R_sat=0.73`, `G_sat=0.90`, `B_sat=0.93`) are tuned for typical OLED oversaturation. Adjust them in **Preferences** to suit your display.
+All defaults start neutral (no correction applied). Adjust them in **Preferences** to suit your display — the **Defaults** tab applies to every monitor, and the **Per Monitor** tab lets you override individual monitors (e.g. tuning OLED oversaturation on one panel without affecting an external display).
 
 ## Installation
 
@@ -51,7 +53,12 @@ Open the preferences window from **Extension Manager** or:
 gnome-extensions prefs display-color-correct@antoniopicone.it
 ```
 
-The preferences UI has two groups of sliders — **Brightness per channel** and **Saturation per channel** — with live preview as you drag.
+The preferences window has two tabs:
+
+- **Defaults** — brightness and saturation sliders per channel, applied to every monitor (greyed out while per-monitor overrides are enabled).
+- **Per Monitor** — a switch to enable per-monitor overrides; when on, pick a monitor from the dropdown and customize its 6 values independently, or reset it back to the defaults.
+
+All sliders give a live preview as you drag.
 
 ## Files
 

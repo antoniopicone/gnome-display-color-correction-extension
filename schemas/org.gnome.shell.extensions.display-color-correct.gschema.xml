@@ -15,15 +15,15 @@
       <summary>Blue channel brightness factor (default / fallback)</summary>
     </key>
     <key name="red-saturation" type="d">
-      <default>0.73</default>
+      <default>1.0</default>
       <summary>Red channel saturation factor (default / fallback)</summary>
     </key>
     <key name="green-saturation" type="d">
-      <default>0.90</default>
+      <default>1.0</default>
       <summary>Green channel saturation factor (default / fallback)</summary>
     </key>
     <key name="blue-saturation" type="d">
-      <default>0.93</default>
+      <default>1.0</default>
       <summary>Blue channel saturation factor (default / fallback)</summary>
     </key>
     <key name="monitor-overrides" type="s">
@@ -34,6 +34,14 @@
         each value an object with r/g/b (brightness) and rSat/gSat/bSat
         (saturation) doubles. Monitors without an entry fall back to the
         red-factor/green-factor/... default keys.
+      </description>
+    </key>
+    <key name="per-monitor-enabled" type="b">
+      <default>false</default>
+      <summary>Enable per-monitor overrides</summary>
+      <description>
+        When false, every monitor uses the red-factor/green-factor/...
+        default keys regardless of what is stored in monitor-overrides.
       </description>
     </key>
   </schema>
