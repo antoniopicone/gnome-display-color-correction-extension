@@ -25,4 +25,4 @@ info "Enabling extension..."
 gnome-extensions enable "${UUID}" 2>/dev/null || \
     warn "Could not enable automatically. After logout/login, enable 'Display Color Correction' in Extension Manager."
 
-ok "Done. Defaults: R_sat=0.73  G_sat=0.90  B_sat=0.93"
+ok "Done. Defaults: all channels neutral (1.0), no correction until configured."
