@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Shell from 'gi://Shell';
 import Cogl from 'gi://Cogl';
 import GObject from 'gi://GObject';
@@ -71,6 +72,8 @@ export default class DisplayColorCorrection extends Extension {
     _effect = null;
     _settings = null;
     _settingsChangedId = 0;
+    _clone = null;
+    _sizeConstraint = null;
 
     enable() {
         try {
@@ -82,7 +85,45 @@ export default class DisplayColorCorrection extends Extension {
             this._settingsChangedId = this._settings.connect(
                 'changed', () => this._applySettings()
             );
-            Main.layoutManager.uiGroup.add_effect(this._effect);
+
+            // NON applichiamo l'effect direttamente a Main.layoutManager.uiGroup.
+            // uiGroup è l'actor "vivo" che Mutter rilayouta continuamente
+            // durante drag/resize delle finestre tra ClutterStageView diverse
+            // (una per monitor). Un ClutterEffect offscreen (Shell.GLSLEffect)
+            // applicato lì entra in conflitto con quel ciclo di relayout e
+            // causa artefatti visivi (flash bianchi) quando una finestra
+            // attraversa il confine tra due monitor.
+            //
+            // La soluzione, documentata nella discussione Mutter MR !2269
+            // (gitlab.gnome.org/GNOME/mutter/-/merge_requests/2269) e usata
+            // da altre estensioni di color-filtering full-screen (es.
+            // gnome-colorblind-filters), è applicare l'effect a un
+            // Clutter.Clone di uiGroup, non all'originale. L'originale
+            // continua a essere gestito dal normale pipeline di Mutter
+            // (relayout e clipped-redraws per-monitor invariati); il clone
+            // è un nodo passivo che si limita a ridisegnare il contenuto
+            // già renderizzato, quindi l'offscreen capture dell'effect non
+            // interferisce più con il drag tra schermi.
+            this._clone = new Clutter.Clone({
+                source: Main.layoutManager.uiGroup,
+                clip_to_allocation: true,
+            });
+
+            // Il clone è puramente visivo: i click/hover devono continuare
+            // a raggiungere gli actor reali sotto di lui.
+            Shell.util_set_hidden_from_pick(this._clone, true);
+
+            // Tiene il clone sempre della stessa dimensione dello stage
+            // (copre tutti i monitor combinati), anche su hotplug/resize.
+            this._sizeConstraint = new Clutter.BindConstraint({
+                source: global.stage,
+                coordinate: Clutter.BindCoordinate.SIZE,
+            });
+            this._clone.add_constraint(this._sizeConstraint);
+
+            this._clone.add_effect(this._effect);
+            global.stage.add_child(this._clone);
+
             console.log('[DisplayColorCorrection] Effect applied');
         } catch (e) {
             console.error('[DisplayColorCorrection] Error:', e.message);
@@ -104,10 +145,13 @@ export default class DisplayColorCorrection extends Extension {
             this._settings?.disconnect(this._settingsChangedId);
             this._settingsChangedId = 0;
         }
-        if (this._effect) {
-            Main.layoutManager.uiGroup.remove_effect(this._effect);
-            this._effect = null;
+        if (this._clone) {
+            global.stage.remove_child(this._clone);
+            this._clone.destroy();
+            this._clone = null;
         }
+        this._sizeConstraint = null;
+        this._effect = null;
         this._settings = null;
         console.log('[DisplayColorCorrection] Effect removed');
     }
