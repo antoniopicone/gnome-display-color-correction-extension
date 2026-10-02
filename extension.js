@@ -11,36 +11,45 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 // Clutter.Clone per monitor).
 const MAX_MONITORS = 6;
 
-const SHADER_DECL = `
+// Un uniform separato per monitor invece di array uniform: il passaggio di
+// array a Clutter.ShaderEffect.set_uniform_float() (GNOME 51) non è
+// documentato in modo chiaro, mentre un singolo float/vec3/vec4 funziona
+// allo stesso modo con entrambe le API.
+let shaderDecl = `
 uniform float monitor_count;
-uniform vec4 monitor_rects[${MAX_MONITORS}];
-uniform float r_factor[${MAX_MONITORS}];
-uniform float g_factor[${MAX_MONITORS}];
-uniform float b_factor[${MAX_MONITORS}];
-uniform float r_sat[${MAX_MONITORS}];
-uniform float g_sat[${MAX_MONITORS}];
-uniform float b_sat[${MAX_MONITORS}];
 
 bool point_in_rect(vec4 rect, vec2 point) {
     return point.x >= rect.x && point.x < rect.x + rect.z &&
            point.y >= rect.y && point.y < rect.y + rect.w;
 }
 `;
+for (let i = 0; i < MAX_MONITORS; i++) {
+    shaderDecl += `
+uniform vec4 monitor_rect_${i};
+uniform vec3 factor_${i};
+uniform vec3 sat_${i};
+`;
+}
+const SHADER_DECL = shaderDecl;
 
-// Sceglie i fattori del monitor a cui appartiene il frammento corrente
-// usando solo indici letterali (monitor_rects[0], [1], ...) invece di un
-// indice calcolato a runtime: alcuni driver GLES non supportano
-// l'indicizzazione dinamica di array uniform nel fragment shader.
+// Sceglie i fattori del monitor a cui appartiene il frammento corrente.
+// Finché gli uniform non sono stati impostati monitor_count vale 0 e lo
+// shader lascia passare i colori invariati, invece di moltiplicarli per i
+// fattori a 0 (schermo nero).
 let monitorSelectCode = `
 int monitor_idx_count = int(monitor_count + 0.5);
-float rF = r_factor[0], gF = g_factor[0], bF = b_factor[0];
-float rS = r_sat[0],    gS = g_sat[0],    bS = b_sat[0];
+vec3 factor = vec3(1.0);
+vec3 sat = vec3(1.0);
+if (monitor_idx_count > 0) {
+    factor = factor_0;
+    sat = sat_0;
+}
 `;
 for (let i = 1; i < MAX_MONITORS; i++) {
     monitorSelectCode += `
-if (monitor_idx_count > ${i} && point_in_rect(monitor_rects[${i}], fragPos)) {
-    rF = r_factor[${i}]; gF = g_factor[${i}]; bF = b_factor[${i}];
-    rS = r_sat[${i}];    gS = g_sat[${i}];    bS = b_sat[${i}];
+if (monitor_idx_count > ${i} && point_in_rect(monitor_rect_${i}, fragPos)) {
+    factor = factor_${i};
+    sat = sat_${i};
 }
 `;
 }
@@ -51,31 +60,19 @@ vec2 fragPos = cogl_tex_coord0_in.st;
 ${monitorSelectCode}
 
 // Brightness correction per channel
-color.r = color.r * rF;
-color.g = color.g * gF;
-color.b = color.b * bF;
+color = color * factor;
 
 // Selective saturation per channel
 float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
-
-float r_delta = color.r - lum;
-color.r = lum + r_delta * rS;
-
-float g_delta = color.g - lum;
-color.g = lum + g_delta * gS;
-
-float b_delta = color.b - lum;
-color.b = lum + b_delta * bS;
+color = vec3(lum) + (color - vec3(lum)) * sat;
 
 color = clamp(color, 0.0, 1.0);
 cogl_color_out.rgb = color;
 `;
 
-const UNIFORM_NAMES = [
-    'monitor_count', 'monitor_rects',
-    'r_factor', 'g_factor', 'b_factor',
-    'r_sat', 'g_sat', 'b_sat',
-];
+const UNIFORM_NAMES = ['monitor_count'];
+for (let i = 0; i < MAX_MONITORS; i++)
+    UNIFORM_NAMES.push(`monitor_rect_${i}`, `factor_${i}`, `sat_${i}`);
 
 // GNOME 48–50: Shell.GLSLEffect, uniform indirizzati per location.
 const LegacyColorCorrectionEffect = Shell.GLSLEffect ? GObject.registerClass(
@@ -123,14 +120,13 @@ class ShaderColorCorrectionEffect extends Clutter.ShaderEffect {
 // (x, y, width, height) normalizzati in [0,1] rispetto allo stage;
 // gli altri array hanno MAX_MONITORS elementi, uno per monitor.
 function setMonitors(effect, count, rects, r, g, b, rSat, gSat, bSat) {
+    for (let i = 0; i < MAX_MONITORS; i++) {
+        effect._setUniform(`monitor_rect_${i}`, 4, rects.slice(i * 4, i * 4 + 4));
+        effect._setUniform(`factor_${i}`, 3, [r[i], g[i], b[i]]);
+        effect._setUniform(`sat_${i}`, 3, [rSat[i], gSat[i], bSat[i]]);
+    }
+    // Per ultimo: finché vale 0 lo shader non altera i colori.
     effect._setUniform('monitor_count', 1, [count]);
-    effect._setUniform('monitor_rects', 4, rects);
-    effect._setUniform('r_factor', 1, r);
-    effect._setUniform('g_factor', 1, g);
-    effect._setUniform('b_factor', 1, b);
-    effect._setUniform('r_sat', 1, rSat);
-    effect._setUniform('g_sat', 1, gSat);
-    effect._setUniform('b_sat', 1, bSat);
     effect.queue_repaint();
 }
 
@@ -187,7 +183,10 @@ export default class DisplayColorCorrection extends Extension {
 
             console.log('[DisplayColorCorrection] Effect applied');
         } catch (e) {
-            console.error('[DisplayColorCorrection] Error:', e.message);
+            console.error('[DisplayColorCorrection] Error:', e.message, e.stack);
+            // Non lasciare sullo stage un clone con un effect a metà
+            // (potrebbe coprire lo schermo).
+            this.disable();
         }
     }
 
