@@ -6,7 +6,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 // Numero massimo di monitor gestiti contemporaneamente dallo shader (vedi
-// commento su ColorCorrectionEffect più sotto sul perché la selezione del
+// commento in enable() più sotto sul perché la selezione del
 // monitor avviene interamente dentro un solo shader invece che con un
 // Clutter.Clone per monitor).
 const MAX_MONITORS = 6;
@@ -71,33 +71,24 @@ color = clamp(color, 0.0, 1.0);
 cogl_color_out.rgb = color;
 `;
 
-const ColorCorrectionEffect = GObject.registerClass(
-class ColorCorrectionEffect extends Shell.GLSLEffect {
+const UNIFORM_NAMES = [
+    'monitor_count', 'monitor_rects',
+    'r_factor', 'g_factor', 'b_factor',
+    'r_sat', 'g_sat', 'b_sat',
+];
+
+// GNOME 48–50: Shell.GLSLEffect, uniform indirizzati per location.
+const LegacyColorCorrectionEffect = Shell.GLSLEffect ? GObject.registerClass(
+class LegacyColorCorrectionEffect extends Shell.GLSLEffect {
     constructor() {
         super();
-        this._countLoc = this.get_uniform_location('monitor_count');
-        this._rectsLoc = this.get_uniform_location('monitor_rects');
-        this._rLoc    = this.get_uniform_location('r_factor');
-        this._gLoc    = this.get_uniform_location('g_factor');
-        this._bLoc    = this.get_uniform_location('b_factor');
-        this._rSatLoc = this.get_uniform_location('r_sat');
-        this._gSatLoc = this.get_uniform_location('g_sat');
-        this._bSatLoc = this.get_uniform_location('b_sat');
+        this._locations = {};
+        for (const name of UNIFORM_NAMES)
+            this._locations[name] = this.get_uniform_location(name);
     }
 
-    // rects è un array piatto di MAX_MONITORS quadrupli
-    // (x, y, width, height) normalizzati in [0,1] rispetto allo stage;
-    // gli altri array hanno MAX_MONITORS elementi, uno per monitor.
-    setMonitors(count, rects, r, g, b, rSat, gSat, bSat) {
-        this.set_uniform_float(this._countLoc, 1, [count]);
-        this.set_uniform_float(this._rectsLoc, 4, rects);
-        this.set_uniform_float(this._rLoc,    1, r);
-        this.set_uniform_float(this._gLoc,    1, g);
-        this.set_uniform_float(this._bLoc,    1, b);
-        this.set_uniform_float(this._rSatLoc, 1, rSat);
-        this.set_uniform_float(this._gSatLoc, 1, gSat);
-        this.set_uniform_float(this._bSatLoc, 1, bSat);
-        this.queue_repaint();
+    _setUniform(name, nComponents, value) {
+        this.set_uniform_float(this._locations[name], nComponents, value);
     }
 
     vfunc_build_pipeline() {
@@ -106,7 +97,42 @@ class ColorCorrectionEffect extends Shell.GLSLEffect {
             : Shell.SnippetHook.FRAGMENT;
         this.add_glsl_snippet(hook, SHADER_DECL, SHADER_CODE, false);
     }
+}) : null;
+
+// GNOME 51+: Shell.GLSLEffect è stato rimosso, al suo posto
+// Clutter.ShaderEffect con uno snippet statico e uniform indirizzati per nome.
+const ShaderColorCorrectionEffect = Shell.GLSLEffect ? null : GObject.registerClass(
+class ShaderColorCorrectionEffect extends Clutter.ShaderEffect {
+    _setUniform(name, nComponents, value) {
+        this.set_uniform_float(name, nComponents, value);
+    }
+
+    vfunc_get_static_snippet() {
+        const snippet = Cogl.Snippet.new(
+            Cogl.SnippetHook.FRAGMENT, SHADER_DECL, ''
+        );
+        // Post, non replace: il codice generato che campiona la texture in
+        // cogl_color_out deve girare prima, come con
+        // add_glsl_snippet(..., false) su Shell.GLSLEffect.
+        snippet.set_post(SHADER_CODE);
+        return snippet;
+    }
 });
+
+// rects è un array piatto di MAX_MONITORS quadrupli
+// (x, y, width, height) normalizzati in [0,1] rispetto allo stage;
+// gli altri array hanno MAX_MONITORS elementi, uno per monitor.
+function setMonitors(effect, count, rects, r, g, b, rSat, gSat, bSat) {
+    effect._setUniform('monitor_count', 1, [count]);
+    effect._setUniform('monitor_rects', 4, rects);
+    effect._setUniform('r_factor', 1, r);
+    effect._setUniform('g_factor', 1, g);
+    effect._setUniform('b_factor', 1, b);
+    effect._setUniform('r_sat', 1, rSat);
+    effect._setUniform('g_sat', 1, gSat);
+    effect._setUniform('b_sat', 1, bSat);
+    effect.queue_repaint();
+}
 
 export default class DisplayColorCorrection extends Extension {
     _settings = null;
@@ -117,7 +143,9 @@ export default class DisplayColorCorrection extends Extension {
         try {
             this._settings = this.getSettings();
 
-            this._effect = new ColorCorrectionEffect();
+            this._effect = LegacyColorCorrectionEffect
+                ? new LegacyColorCorrectionEffect()
+                : new ShaderColorCorrectionEffect();
 
             // Un solo Clutter.Clone di tutto uiGroup con un solo effect,
             // esattamente come nella versione single-monitor originale (vedi
@@ -280,7 +308,8 @@ export default class DisplayColorCorrection extends Extension {
             rSat.push(1); gSat.push(1); bSat.push(1);
         }
 
-        this._effect?.setMonitors(count, rects, r, g, b, rSat, gSat, bSat);
+        if (this._effect)
+            setMonitors(this._effect, count, rects, r, g, b, rSat, gSat, bSat);
     }
 
     disable() {
