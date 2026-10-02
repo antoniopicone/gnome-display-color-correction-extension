@@ -181,7 +181,6 @@ export default class DisplayColorCorrection extends Extension {
 
             this._applyAllSettings();
 
-            console.log('[DisplayColorCorrection] Effect applied');
         } catch (e) {
             console.error('[DisplayColorCorrection] Error:', e.message, e.stack);
             // Non lasciare sullo stage un clone con un effect a metà
@@ -213,10 +212,7 @@ export default class DisplayColorCorrection extends Extension {
                         return physicalMonitors[0].get_connector();
                 }
             }
-            console.log(
-                `[DisplayColorCorrection] no logical monitor number match for ` +
-                `layoutManager monitor idx=${monitor.index}`
-            );
+            
         } catch (e) {
             console.error(`[DisplayColorCorrection] connector lookup failed: ${e.message}`);
         }
@@ -259,10 +255,7 @@ export default class DisplayColorCorrection extends Extension {
     _applyAllSettings() {
         const overrides = this._loadOverrides();
         const perMonitorEnabled = this._settings.get_boolean('per-monitor-enabled');
-        console.log(
-            `[DisplayColorCorrection] per-monitor-enabled=${perMonitorEnabled} ` +
-            `overrides keys: ${Object.keys(overrides).join(', ') || '(none)'}`
-        );
+        
 
         const monitors = Main.layoutManager.monitors;
         const stageWidth = global.stage.width;
@@ -285,10 +278,7 @@ export default class DisplayColorCorrection extends Extension {
             const hasOverride = perMonitorEnabled && !!overrides[connector];
             const [mr, mg, mb, mrSat, mgSat, mbSat] = this._factorsForConnector(connector);
 
-            console.log(
-                `[DisplayColorCorrection] apply connector="${connector}" ` +
-                `override=${hasOverride} r=${mr} g=${mg} b=${mb} rSat=${mrSat} gSat=${mgSat} bSat=${mbSat}`
-            );
+            
 
             rects.push(
                 monitor.x / stageWidth, monitor.y / stageHeight,
@@ -321,6 +311,6 @@ export default class DisplayColorCorrection extends Extension {
         }
         this._effect = null;
         this._settings = null;
-        console.log('[DisplayColorCorrection] Effect removed');
+        
     }
 }
