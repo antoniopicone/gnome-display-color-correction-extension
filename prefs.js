@@ -18,9 +18,7 @@ const CHANNEL_FIELDS = [
 
 export default class DisplayColorCorrectionPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
-        const settings = this.getSettings(
-            'org.gnome.shell.extensions.display-color-correct'
-        );
+        const settings = this.getSettings();
 
         window.add(this._buildDefaultsPage(settings));
         window.add(this._buildPerMonitorPage(settings));

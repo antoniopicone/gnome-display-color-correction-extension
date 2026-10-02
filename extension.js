@@ -110,16 +110,12 @@ class ColorCorrectionEffect extends Shell.GLSLEffect {
 
 export default class DisplayColorCorrection extends Extension {
     _settings = null;
-    _settingsChangedId = 0;
-    _monitorsChangedId = 0;
     _clone = null;
     _effect = null;
 
     enable() {
         try {
-            this._settings = this.getSettings(
-                'org.gnome.shell.extensions.display-color-correct'
-            );
+            this._settings = this.getSettings();
 
             this._effect = new ColorCorrectionEffect();
 
@@ -154,12 +150,10 @@ export default class DisplayColorCorrection extends Extension {
             this._clone.add_effect(this._effect);
             global.stage.add_child(this._clone);
 
-            this._settingsChangedId = this._settings.connect(
-                'changed', () => this._applyAllSettings()
-            );
-            this._monitorsChangedId = Main.layoutManager.connect(
-                'monitors-changed', () => this._applyAllSettings()
-            );
+            this._settings.connectObject(
+                'changed', () => this._applyAllSettings(), this);
+            Main.layoutManager.connectObject(
+                'monitors-changed', () => this._applyAllSettings(), this);
 
             this._applyAllSettings();
 
@@ -290,14 +284,8 @@ export default class DisplayColorCorrection extends Extension {
     }
 
     disable() {
-        if (this._settingsChangedId) {
-            this._settings?.disconnect(this._settingsChangedId);
-            this._settingsChangedId = 0;
-        }
-        if (this._monitorsChangedId) {
-            Main.layoutManager.disconnect(this._monitorsChangedId);
-            this._monitorsChangedId = 0;
-        }
+        this._settings?.disconnectObject(this);
+        Main.layoutManager.disconnectObject(this);
         if (this._clone) {
             global.stage.remove_child(this._clone);
             this._clone.destroy();

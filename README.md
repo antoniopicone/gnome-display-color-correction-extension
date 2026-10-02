@@ -3,7 +3,7 @@
 A GNOME Shell extension that applies per-channel brightness and saturation corrections to the entire display via a GLSL shader. Useful for taming oversaturated OLED panels (e.g. ASUS Zenbook).
 
 - **UUID:** `display-color-correct@antoniopicone.it`
-- **GNOME Shell:** 48, 49, 50
+- **GNOME Shell:** 48, 49, 50, 51
 
 ## How it works
 
